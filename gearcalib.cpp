@@ -1,5 +1,19 @@
 #include <TMB.hpp>
 
+// Random Walk density ('huge' is optional)
+template<class Type>
+Type RW_logdens(vector<Type> x, Type sd, int order=1){
+  for(int i=0; i<order; i++) x = diff(x);
+  return dnorm(x, Type(0), sd, true).sum();
+}
+template<class Type>
+Type RW_logdens(vector<Type> x, Type sd, Type huge, int order=1){
+  Type ans = 0;
+  for(int i=0; i<order; i++) ans += dnorm(x(i), Type(0), huge, true);
+  ans += RW_logdens(x, sd, order);
+  return ans;
+}
+
 // Compare two gear types
 
 template<class Type>
@@ -12,6 +26,7 @@ Type objective_function<Type>::operator() ()
   DATA_FACTOR(Gear);            // length(Gear)=nhaul. Defines the two gear types
   DATA_SCALAR(huge);            // "Infinite" standard deviation on log scale
   DATA_SCALAR(tiny);            // "Zero" standard deviation on log scale
+  DATA_IVECTOR(rw_order);       // Order of logspectrum and loggear RW
   PARAMETER_ARRAY(logspectrum); // group x size. One spectrum for each pair id
   PARAMETER_ARRAY(nugget);      // haul x size. One nugget for each haul
   PARAMETER_ARRAY(residual);    // haul x size. One AR residual for each haul
@@ -37,30 +52,24 @@ Type objective_function<Type>::operator() ()
   Type sdGearRW=exp(logsdGearRW);
   Type sdnug=exp(logsdnug);
 
-  // "Huge" or "Strictly infinte" variance on first size group?
-  ans -= dnorm(vector<Type>(logspectrum.col(0)),Type(0),huge,true).sum();
-
   // Random walk over size spectrum at each station
-  for(int i=1;i<nsize;i++){
-    ans -= dnorm(vector<Type>(logspectrum.col(i)-logspectrum.col(i-1)),Type(0),sd,true).sum();
+  for(int i=0; i<tlogspectrum.cols(); i++){
+    ans -= RW_logdens(vector<Type>(tlogspectrum.col(i)), sd, huge, rw_order(0));
   }
 
   // AR(1) residuals
   using namespace density;
   SCALE_t< AR1_t<N01<Type> > >  nldens=SCALE(AR1(phi),exp(logsdres));
-  for(int i=0;i<nhaul;i++){
-    ans+=nldens(tresidual.col(i));
+  for(int i=0; i<nhaul; i++){
+    ans += nldens(tresidual.col(i));
   }
 
   // White noise nugget effect
   for(int j=0;j<nsize;j++)
     ans -= dnorm(vector<Type>(nugget.col(j)),Type(0),sdnug,true).sum();
 
-
   // Random walk prior on gear effect
-  // ans-=dnorm(loggear(i,0),Type(0),huge,true);
-  for(int j=1;j<nsize;j++)
-      ans -= dnorm(loggear(j)-loggear(j-1),Type(0),sdGearRW,true);
+  ans -= RW_logdens(loggear, sdGearRW, huge, rw_order(1));
 
   // Add data
   vector<Type> logintensity(nsize);

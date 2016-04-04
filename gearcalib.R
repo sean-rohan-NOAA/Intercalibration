@@ -36,6 +36,9 @@ fitmodel <- function(Species,GearNames,d)
         nhaul <- nrow(d$N)
         ngear <- nlevels(d$Gear)
 
+        ## Set default RW order
+        rw_order <- c(1,1)
+
         obj <- MakeADFun(
             data=list(
                 N=d$N,
@@ -43,7 +46,8 @@ fitmodel <- function(Species,GearNames,d)
                 group=d$group,
                 Gear=d$Gear,
                 huge=10,
-                tiny=0.01
+                tiny=0.01,
+                rw_order=rw_order
             ),
             parameters=list(
                 logspectrum=matrix(0,ngroup,nsize),
@@ -69,7 +73,8 @@ fitmodel <- function(Species,GearNames,d)
                 group=d$group,
                 Gear=d$Gear,
                 huge=10,
-                tiny=0.01
+                tiny=0.01,
+                rw_order=rw_order
             ),
             parameters=list(
                 logspectrum=matrix(0,ngroup,nsize),
