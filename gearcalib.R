@@ -9,7 +9,7 @@ Lmax <- 80
 
 Lvec <- seq(Lmin,Lmax)
 
-Do.Intercal <- FALSE
+Do.Intercal <- !FALSE
 Do.Verification <- FALSE
 
 fitmodel <- function(Species,GearNames,d)
@@ -37,7 +37,7 @@ fitmodel <- function(Species,GearNames,d)
         ngear <- nlevels(d$Gear)
 
         ## Set default RW order
-        rw_order <- c(1,1)
+        rw_order <- c(3,3)
 
         obj <- MakeADFun(
             data=list(
