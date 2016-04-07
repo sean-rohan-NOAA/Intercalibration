@@ -213,19 +213,19 @@ fitmodel <- function(Species,GearNames,d,fit0=FALSE)
 
         dev.copy2pdf(file=paste("Relsel-",Species,"-",GearNames[2],"-vs-",GearNames[1],".pdf",sep=""))
 
-        plot(Lmin:Lmax,log10(1+Density1),
-             ylim=log10(1+range(c(Density1,Density2))),
-             xlim=c(Lmin,Lmax),
-             type="l",lty="dashed",
-             xlab="Length [cm]",ylab="Density (log10(N/A+1))")
-        points(Lmin:Lmax,log10(1+Density1),pch="o")
-        lines(Lmin:Lmax,log10(1+Density2))
-        points(Lmin:Lmax,log10(1+Density2),pch="+")
-        legend("topright",legend=GearNames,lty=c("dashed","solid"),pch=c("o","+"))
+        ## plot(Lmin:Lmax,log10(1+Density1),
+        ##      ylim=log10(1+range(c(Density1,Density2))),
+        ##      xlim=c(Lmin,Lmax),
+        ##      type="l",lty="dashed",
+        ##      xlab="Length [cm]",ylab="Density (log10(N/A+1))")
+        ## points(Lmin:Lmax,log10(1+Density1),pch="o")
+        ## lines(Lmin:Lmax,log10(1+Density2))
+        ## points(Lmin:Lmax,log10(1+Density2),pch="+")
+        ## legend("topright",legend=GearNames,lty=c("dashed","solid"),pch=c("o","+"))
 
-        grid()
+        ## grid()
 
-        dev.copy2pdf(file=paste("Density-",Species,"-",GearNames[2],"-vs-",GearNames[1],".pdf",sep=""))
+        ## dev.copy2pdf(file=paste("Density-",Species,"-",GearNames[2],"-vs-",GearNames[1],".pdf",sep=""))
 
         ## #############################################################################################
         ## Plot example of a size spectrum
