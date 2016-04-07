@@ -9,10 +9,59 @@ Lmax <- 80
 
 Lvec <- seq(Lmin,Lmax)
 
-Do.Intercal <- !FALSE
+Do.Intercal <- TRUE
 Do.Verification <- FALSE
 
-fitmodel <- function(Species,GearNames,d)
+## Empirical estimate with bootstrap confidence regions
+boot <- function(d,quantiles = c(0.025,0.16,0.5,0.84,0.975))
+    {
+        GearNames <- levels(d$Gear)
+
+        ## Raw data: Total catches
+        I1 <- d$Gear==GearNames[1]
+        I2 <- d$Gear==GearNames[2]
+
+        totcatch1 <- apply(d$N[I1,],2,sum)
+        totcatch2 <- apply(d$N[I2,],2,sum)
+
+        Density1 <- totcatch1 / sum(d$SweptArea[I1])
+        Density2 <- totcatch2 / sum(d$SweptArea[I2])
+
+        tiny <- 1e-6
+        
+        RawEstimate <- (Density2 + tiny) / (Density1 + tiny)
+
+        Nboot <- 1000
+
+        BootEstimate <- array(NA,c(Nboot,length(RawEstimate)))
+
+        for(i in 1:Nboot)
+            {
+                ## Select random groups with replacement
+                GroupBoot <- sample(1:length(levels(d$group)),length(levels(d$group)),replace=TRUE)
+                
+                Haul1 <- as.numeric(sapply(GroupBoot,function(g) which( (as.numeric(d$group) == g) & I1)))
+                Haul2 <- as.numeric(sapply(GroupBoot,function(g) which( (as.numeric(d$group) == g) & I2)))
+
+                Nb1 <- d$N[Haul1,]
+                Nb2 <- d$N[Haul2,]
+
+                Db1 <- apply(Nb1,2,sum) / sum(d$SweptArea[Haul1])
+                Db2 <- apply(Nb2,2,sum) / sum(d$SweptArea[Haul2])
+
+                BootEstimate[i,] <- (Db2 + tiny) / (Db1 + tiny) 
+            }
+
+        BootQuantiles <- apply(BootEstimate,2,function(x)quantile(x,quantiles))
+
+        return(list(RawEstimate=RawEstimate,
+                    BootEstimate=BootEstimate,
+                    BootQuantiles=BootQuantiles))
+
+    }
+
+
+ChooseGear <- function(d,GearNames)
     {
         ## Construct table of which gears are used in which groups
         tt <- table(d$group,d$Gear)
@@ -20,6 +69,7 @@ fitmodel <- function(Species,GearNames,d)
         ## Identify those groups where the two gears are used
         UseGroups <- tt[,GearNames[1]] & tt[,GearNames[2]] 
 
+        ## Identify those hauls which are part of these groups
         I <- sapply(d$group,function(g)UseGroups[g])
 
         ## Use only if SweptArea is finite
@@ -31,13 +81,21 @@ fitmodel <- function(Species,GearNames,d)
         d$group <- factor(d$group[I],levels=unique(d$group[I]))
         d$Gear <- factor(d$Gear[I],levels=GearNames)
 
+        return(d)
+    }
+
+
+fitmodel <- function(Species,GearNames,d,fit0=FALSE)
+    {
+        d <- ChooseGear(d,GearNames)
+        
         nsize <- ncol(d$N)
         ngroup <- nlevels(d$group)
         nhaul <- nrow(d$N)
         ngear <- nlevels(d$Gear)
 
         ## Set default RW order
-        rw_order <- c(3,3)
+        rw_order <- c(1,1)
 
         obj <- MakeADFun(
             data=list(
@@ -66,34 +124,6 @@ fitmodel <- function(Species,GearNames,d)
             DLL="gearcalib"
         )
 
-        obj0 <- MakeADFun(
-            data=list(
-                N=d$N,
-                SweptArea=d$SweptArea,
-                group=d$group,
-                Gear=d$Gear,
-                huge=10,
-                tiny=0.01,
-                rw_order=rw_order
-            ),
-            parameters=list(
-                logspectrum=matrix(0,ngroup,nsize),
-                nugget=matrix(0,nhaul,nsize),
-                residual=matrix(0,nhaul,nsize),
-                loggear=numeric(nsize),
-                logsd=-1,
-                phi=.5,
-                logsdnug=-1,
-                logsdres=-1,
-                logsdGearRW=-10,
-                alpha = 1
-            ),
-            ## map = list(phi=factor(NA),logsdnug=factor(NA),logsdGearRW=factor(NA)),    
-            map = list(alpha=factor(NA),logsdGearRW=factor(NA)),    
-
-            random=c("logspectrum","residual","loggear","nugget"),
-            DLL="gearcalib"
-        )
 
         lower <- 0*obj$par-Inf
         upper <- 0*obj$par+Inf
@@ -101,16 +131,52 @@ fitmodel <- function(Species,GearNames,d)
         upper["phi"] <- 0.9999
 
         obj$env$tracepar <- TRUE
-        obj0$env$tracepar <- TRUE
-        
+
         system.time( opt <- nlminb(obj$par,obj$fn,obj$gr,lower=lower,upper=upper) )
-        system.time( opt0 <- nlminb(obj0$par,obj0$fn,obj0$gr,lower=lower,upper=upper) )
+        Pvalue <- NA
 
-        Pvalue <- pchisq(2*(opt0$objective-opt$objective),df=1)
+        if(fit0)
+            {
+                obj0 <- MakeADFun(
+                    data=list(
+                        N=d$N,
+                        SweptArea=d$SweptArea,
+                        group=d$group,
+                        Gear=d$Gear,
+                        huge=10,
+                        tiny=0.01,
+                        rw_order=rw_order
+                        ),
+                    parameters=list(
+                        logspectrum=matrix(0,ngroup,nsize),
+                        nugget=matrix(0,nhaul,nsize),
+                        residual=matrix(0,nhaul,nsize),
+                        loggear=numeric(nsize),
+                        logsd=-1,
+                        phi=.5,
+                        logsdnug=-1,
+                        logsdres=-1,
+                        logsdGearRW=-10,
+                        alpha = 1
+                        ),
+                    ## map = list(phi=factor(NA),logsdnug=factor(NA),logsdGearRW=factor(NA)),    
+                    map = list(alpha=factor(NA),logsdGearRW=factor(NA)),    
 
-        print(paste("Chisq-test of no size structure in gear effect:",Pvalue))
+                    random=c("logspectrum","residual","loggear","nugget"),
+                    DLL="gearcalib"
+                    )
 
-        rm(obj0)
+                obj0$env$tracepar <- TRUE
+                
+                system.time( opt0 <- nlminb(obj0$par,obj0$fn,obj0$gr,lower=lower,upper=upper) )
+
+                Pvalue <- pchisq(2*(opt0$objective-opt$objective),df=1)
+
+                print(paste("Chisq-test of no size structure in gear effect:",Pvalue))
+
+                rm(obj0)
+            }
+
         save.image(file=paste("Image-",Species,"-",GearNames[2],"-vs-",GearNames[1],".Rdata",sep=""))
 
         rep <- sdreport(obj)
@@ -120,18 +186,10 @@ fitmodel <- function(Species,GearNames,d)
         est <- 2*s[,1]
         sd <- 2*s[,2]
 
-        GearNames <- levels(d$Gear)
+        emp <- boot(d)
 
-        ## Raw data: Total catches
-        I1 <- d$Gear==GearNames[1]
-        I2 <- d$Gear==GearNames[2]
-
-        totcatch1 <- apply(d$N[I1,],2,sum)
-        totcatch2 <- apply(d$N[I2,],2,sum)
-
-        Density1 <- totcatch1 / sum(d$SweptArea[I1])
-        Density2 <- totcatch2 / sum(d$SweptArea[I2])
-
+        b <- boot(d)
+        
         ## Plots
         X11()
 
@@ -148,7 +206,9 @@ fitmodel <- function(Species,GearNames,d)
                 col="grey",border=NA)
         lines(Lmin:Lmax,exp(est),lwd=3)
 
-        points(Lmin:Lmax,Density2/Density1)
+        points(Lmin:Lmax,b$RawEstimate)
+        apply(b$BootQuantiles,1,function(x)lines(Lmin:Lmax,x))
+
         grid()
 
         dev.copy2pdf(file=paste("Relsel-",Species,"-",GearNames[2],"-vs-",GearNames[1],".pdf",sep=""))
@@ -222,7 +282,7 @@ if(Do.Intercal)
                     d <- eval(parse(text=paste("listIntercalData_",Species,sep="")))
 
                     d$group <- factor(d$group)
-
+                    
                     ## Change order of gear such that Gisund is reference
                     d$Gear <- factor(d$Gear,levels=rev(unique(d$Gear)))
 
