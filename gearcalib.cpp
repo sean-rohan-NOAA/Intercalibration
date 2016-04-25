@@ -36,7 +36,7 @@ Type objective_function<Type>::operator() ()
   PARAMETER(logsdnug);          // sd of nugget effect
   PARAMETER(logsdres);          // sd of residuals
   PARAMETER(logsdGearRW);       // sd of increments in gear effect
-  PARAMETER(alpha);             // Exponent on the effect of SweptArea
+  PARAMETER(logalpha);             // Exponent on the effect of SweptArea
 
   // Transpose for access by row:
   array<Type> tnugget=nugget.transpose();
@@ -51,6 +51,7 @@ Type objective_function<Type>::operator() ()
   Type sd=exp(logsd);
   Type sdGearRW=exp(logsdGearRW);
   Type sdnug=exp(logsdnug);
+  Type alpha=exp(logalpha);
 
   // Random walk over size spectrum at each station
   for(int i=0; i<tlogspectrum.cols(); i++){

@@ -6,8 +6,9 @@ dyn.load("gearcalib.so")
 ## Specify range of length classes to include in the model
 Lmin <- 10
 Lmax <- 80
+dL <- 1
 
-Lvec <- seq(Lmin,Lmax)
+Lvec <- seq(Lmin,Lmax,dL)
 
 Do.Intercal <- TRUE
 Do.Verification <- FALSE
@@ -61,6 +62,24 @@ boot <- function(d,quantiles = c(0.025,0.16,0.5,0.84,0.975))
     }
 
 
+### Choose and combine length groups
+### N must be a matrix where columns represent different length classes.
+### The length classes are in L0 and defaults to the column numbers
+### We subsample from N the length classes in Lvec
+ChooseLengthGroups <- function(N,Lvec)
+{
+
+    A <- array(0,c(length(Lvec),ncol(N)))
+    for(i in 1:(length(Lvec)-1)) A[i,Lvec[i]:(Lvec[i+1]-1)] <- 1
+    Lend <- tail(Lvec,2)
+    A[length(Lvec),Lend[2]:(2*Lend[2]-Lend[1]-1)] <- 1
+    
+    No <- N %*% t(A)
+    colnames(No) <- Lvec
+    return(No)
+}
+
+
 ChooseGear <- function(d,GearNames)
     {
         ## Construct table of which gears are used in which groups
@@ -77,7 +96,7 @@ ChooseGear <- function(d,GearNames)
         
         ## Select only these records
         d$SweptArea <- d$SweptArea[I]
-        d$N <- d$N[I,Lmin:Lmax]
+        d$N <- d$N[I,]
         d$group <- factor(d$group[I],levels=unique(d$group[I]))
         d$Gear <- factor(d$Gear[I],levels=GearNames)
 
@@ -85,9 +104,11 @@ ChooseGear <- function(d,GearNames)
     }
 
 
-fitmodel <- function(Species,GearNames,d,fit0=FALSE)
+fitmodel <- function(Species,GearNames,d,Lvec,fit0=FALSE)
     {
         d <- ChooseGear(d,GearNames)
+
+        d$N <- ChooseLengthGroups(d$N,Lvec)
         
         nsize <- ncol(d$N)
         ngroup <- nlevels(d$group)
@@ -97,38 +118,48 @@ fitmodel <- function(Species,GearNames,d,fit0=FALSE)
         ## Set default RW order
         rw_order <- c(1,1)
 
+        data <- list(
+            N=d$N,
+            SweptArea=d$SweptArea,
+            group=d$group,
+            Gear=d$Gear,
+            huge=10,
+            tiny=0.01,
+            rw_order=rw_order
+            )
+
+        parameters=list(
+            logspectrum=matrix(0,ngroup,nsize),
+            nugget=matrix(0,nhaul,nsize),
+            residual=matrix(0,nhaul,nsize),
+            loggear=numeric(nsize),
+            logsd=-1,
+            phi=0.99,
+            logsdnug=-1,
+            logsdres=-1,
+            logsdGearRW=-1,
+            logalpha = 0
+            )
+
+        random <- c("logspectrum","residual","loggear","nugget")
+
+        map <- list()
+        
         obj <- MakeADFun(
-            data=list(
-                N=d$N,
-                SweptArea=d$SweptArea,
-                group=d$group,
-                Gear=d$Gear,
-                huge=10,
-                tiny=0.01,
-                rw_order=rw_order
-            ),
-            parameters=list(
-                logspectrum=matrix(0,ngroup,nsize),
-                nugget=matrix(0,nhaul,nsize),
-                residual=matrix(0,nhaul,nsize),
-                loggear=numeric(nsize),
-                logsd=-1,
-                phi=.5,
-                logsdnug=-1,
-                logsdres=-1,
-                logsdGearRW=-1,
-                alpha = 1
-            ),
-            map = list(alpha=factor(NA)), # phi=factor(NA),logsdnug=factor(NA),logsdGearRW=factor(NA)),
-            random=c("logspectrum","residual","loggear","nugget"),
+            data = data,
+            parameters = parameters,
+            map = map, # phi=factor(NA),logsdnug=factor(NA),logsdGearRW=factor(NA)),
+            random = random,
             DLL="gearcalib"
         )
 
-
         lower <- 0*obj$par-Inf
         upper <- 0*obj$par+Inf
-        lower["phi"] <- 0
-        upper["phi"] <- 0.9999
+        if(any("phi" == names(obj$par)))
+            {
+                lower["phi"] <- 0
+                upper["phi"] <- 0.9999
+            }
 
         obj$env$tracepar <- TRUE
 
@@ -137,32 +168,14 @@ fitmodel <- function(Species,GearNames,d,fit0=FALSE)
 
         if(fit0)
             {
+                parameters0 <- parameters
+                parameters0$logsdGearRW <- -10
+                
                 obj0 <- MakeADFun(
-                    data=list(
-                        N=d$N,
-                        SweptArea=d$SweptArea,
-                        group=d$group,
-                        Gear=d$Gear,
-                        huge=10,
-                        tiny=0.01,
-                        rw_order=rw_order
-                        ),
-                    parameters=list(
-                        logspectrum=matrix(0,ngroup,nsize),
-                        nugget=matrix(0,nhaul,nsize),
-                        residual=matrix(0,nhaul,nsize),
-                        loggear=numeric(nsize),
-                        logsd=-1,
-                        phi=.5,
-                        logsdnug=-1,
-                        logsdres=-1,
-                        logsdGearRW=-10,
-                        alpha = 1
-                        ),
-                    ## map = list(phi=factor(NA),logsdnug=factor(NA),logsdGearRW=factor(NA)),    
-                    map = list(alpha=factor(NA),logsdGearRW=factor(NA)),    
-
-                    random=c("logspectrum","residual","loggear","nugget"),
+                    data = data,
+                    parameters = parameters0,
+                    map = c(map,list(logsdGearRW=factor(NA))),
+                    random = random,
                     DLL="gearcalib"
                     )
 
@@ -177,8 +190,6 @@ fitmodel <- function(Species,GearNames,d,fit0=FALSE)
                 rm(obj0)
             }
 
-        save.image(file=paste("Image-",Species,"-",GearNames[2],"-vs-",GearNames[1],".Rdata",sep=""))
-
         rep <- sdreport(obj)
 
         repsum <- summary(rep)
@@ -189,38 +200,48 @@ fitmodel <- function(Species,GearNames,d,fit0=FALSE)
         emp <- boot(d)
 
         b <- boot(d)
-        
+
+        save.image(file=paste("Image-",Species,"-",GearNames[2],"-vs-",GearNames[1],".Rdata",sep=""))
+
+        return(list(Lvec=Lvec,Species=Species,GearNames=GearNames,d=d,Pvalue=Pvalue,rep=rep,opt=opt,obj=obj,est=est,sd=sd,emp=emp,b=b))
+
+    }
+
+plotmodel <- function(fit)
+    {
         ## Plots
         X11()
 
-        plot(c(Lmin,Lmax),c(0,max(exp(est + sd %o% c(0,-2,2)))),type="n",
+        with(fit,{
+        
+        plot(range(Lvec),c(0,max(exp(est + sd %o% c(0,-2,2)))),type="n",
              ylim=c(0,2),
-             xlim=c(Lmin,Lmax),
+             xlim=range(Lvec),
              xlab="Length [cm]",
              ylab=paste(GearNames[2]," vs. ",GearNames[1]),
              main=paste("Relative selectivity for", Species))
 
-        lines(c(Lmin,Lmax),rep(1,2),col="darkgrey",lwd=3,lty="dashed")
+        lines(range(Lvec),rep(1,2),col="darkgrey",lwd=3,lty="dashed")
 
-        polygon(c(Lmin:Lmax,Lmax:Lmin),c(exp(est-2*sd),rev(exp(est+2*sd))),
+        polygon(c(Lvec,rev(Lvec)),c(exp(est-2*sd),rev(exp(est+2*sd))),
                 col="grey",border=NA)
-        lines(Lmin:Lmax,exp(est),lwd=3)
+        lines(Lvec,exp(est),lwd=3)
 
-        points(Lmin:Lmax,b$RawEstimate)
-        apply(b$BootQuantiles,1,function(x)lines(Lmin:Lmax,x))
+        points(Lvec,b$RawEstimate)
+        apply(b$BootQuantiles,1,function(x)lines(Lvec,x))
 
         grid()
 
         dev.copy2pdf(file=paste("Relsel-",Species,"-",GearNames[2],"-vs-",GearNames[1],".pdf",sep=""))
 
-        ## plot(Lmin:Lmax,log10(1+Density1),
+        ## plot(Lvec,log10(1+Density1),
         ##      ylim=log10(1+range(c(Density1,Density2))),
         ##      xlim=c(Lmin,Lmax),
         ##      type="l",lty="dashed",
         ##      xlab="Length [cm]",ylab="Density (log10(N/A+1))")
-        ## points(Lmin:Lmax,log10(1+Density1),pch="o")
-        ## lines(Lmin:Lmax,log10(1+Density2))
-        ## points(Lmin:Lmax,log10(1+Density2),pch="+")
+        ## points(Lvec,log10(1+Density1),pch="o")
+        ## lines(Lvec,log10(1+Density2))
+        ## points(Lvec,log10(1+Density2),pch="+")
         ## legend("topright",legend=GearNames,lty=c("dashed","solid"),pch=c("o","+"))
 
         ## grid()
@@ -239,17 +260,17 @@ fitmodel <- function(Species,GearNames,d,fit0=FALSE)
 
         nug1 <- pl$residual[iii,]
 
-        plot(Lmin:Lmax,exp(spec[ii,])*d$SweptArea[ii],log="y",type="l",ylim=c(1e-1,max(d$N[iii,])),
-             xlim=c(Lmin,Lmax),
+        plot(Lvec,exp(spec[ii,])*d$SweptArea[ii],log="y",type="l",ylim=c(1e-1,max(d$N[iii,])),
+             xlim=range(Lvec),
              xlab="Length [cm]",ylab="Size spectrum of population [#/cm]",lwd=3,
              main=paste(Species,"at station",d$group[ii]))
         grid()
 
-        lines(Lmin:Lmax,exp(spec[ii,] + nug1[1,])*d$SweptArea[ii],lty="solid")
-        lines(Lmin:Lmax,exp(spec[ii,] + nug1[2,])*d$SweptArea[ii],lty="dashed")
+        lines(Lvec,exp(spec[ii,] + nug1[1,])*d$SweptArea[ii],lty="solid")
+        lines(Lvec,exp(spec[ii,] + nug1[2,])*d$SweptArea[ii],lty="dashed")
 
-        points(Lmin:Lmax,d$N[iii[1],],pch="+")
-        points(Lmin:Lmax,d$N[iii[2],],pch="o")
+        points(Lvec,d$N[iii[1],],pch="+")
+        points(Lvec,d$N[iii[2],],pch="o")
 
         legend("bottom",legend=c("Size structure at station",
                             paste(GearNames[1],", observed and modelled"),
@@ -260,12 +281,12 @@ fitmodel <- function(Species,GearNames,d,fit0=FALSE)
 
         dev.copy2pdf(file=paste("Sample-",Species,"-",GearNames[2],"-vs-",GearNames[1],".pdf",sep=""))
 
-        res <- data.frame(L=Lmin:Lmax,est=est,sd=sd)
+        res <- data.frame(L=Lvec,est=est,sd=sd)
 
         write.table(res,file=paste("Results-",Species,"-",GearNames[2],"-vs-",GearNames[1],".csv",sep=""))
         write.table(res,file=paste("Estimates-",Species,"-",GearNames[2],"-vs-",GearNames[1],".csv",sep=""))
 
-        return(list(Species=Species,GearNames=GearNames,d=d,res=res,Pvalue=Pvalue,rep=rep,opt=opt,obj=obj))
+    })
     }
 
 fits <- list()
@@ -276,7 +297,7 @@ if(Do.Intercal)
         filename <- paste(Dir,"InterCal_Merluccius.RData",sep="/")
         load(filename)
 
-        for(Species in c("Paradoxus"))
+        for(Species in c("Capensis"))
             for(gear in c("Afr_Old"))
                 {
                     d <- eval(parse(text=paste("listIntercalData_",Species,sep="")))
@@ -292,7 +313,8 @@ if(Do.Intercal)
                     ## Compare these two gear types
                     GearNames <- c("Gisund",gear)
 
-                    fits[[length(fits)+1]] <- fitmodel(Species,GearNames,d)
+                    fits[[length(fits)+1]] <- fitmodel(Species,GearNames,d,Lvec)
+                    plotmodel(fits[[length(fits)]])
                 }
     }
 
