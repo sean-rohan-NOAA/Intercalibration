@@ -10,8 +10,8 @@ dL <- 1
 
 Lvec <- seq(Lmin,Lmax,dL)
 
-Do.Intercal <- TRUE
-Do.Verification <- FALSE
+Do.Intercal <- FALSE
+Do.Verification <- TRUE
 
 ## Empirical estimate with bootstrap confidence regions
 boot <- function(d,quantiles = c(0.025,0.16,0.5,0.84,0.975))
@@ -57,7 +57,9 @@ boot <- function(d,quantiles = c(0.025,0.16,0.5,0.84,0.975))
 
         return(list(RawEstimate=RawEstimate,
                     BootEstimate=BootEstimate,
-                    BootQuantiles=BootQuantiles))
+                    BootQuantiles=BootQuantiles,
+                    Density1=Density1,
+                    Density2=Density2))
 
     }
 
@@ -203,7 +205,9 @@ fitmodel <- function(Species,GearNames,d,Lvec,fit0=FALSE)
 
         save.image(file=paste("Image-",Species,"-",GearNames[2],"-vs-",GearNames[1],".Rdata",sep=""))
 
-        return(list(Lvec=Lvec,Species=Species,GearNames=GearNames,d=d,Pvalue=Pvalue,rep=rep,opt=opt,obj=obj,est=est,sd=sd,emp=emp,b=b))
+        return(list(Lvec=Lvec,Species=Species,GearNames=GearNames,d=d,
+                    Pvalue=Pvalue,rep=rep,opt=opt,obj=obj,est=est,sd=sd,
+                    emp=emp,b=b,Density1=b$Density1,Density2=b$Density2))
 
     }
 
@@ -214,79 +218,80 @@ plotmodel <- function(fit)
 
         with(fit,{
         
-        plot(range(Lvec),c(0,max(exp(est + sd %o% c(0,-2,2)))),type="n",
-             ylim=c(0,2),
-             xlim=range(Lvec),
-             xlab="Length [cm]",
-             ylab=paste(GearNames[2]," vs. ",GearNames[1]),
-             main=paste("Relative selectivity for", Species))
+                 plot(range(Lvec),c(0,max(exp(est + sd %o% c(0,-2,2)))),type="n",
+                      ylim=c(0,2),
+                      xlim=range(Lvec),
+                      xlab="Length [cm]",
+                      ylab=paste(GearNames[2]," vs. ",GearNames[1]),
+                      main=paste("Relative selectivity for", Species))
+                 
+                 lines(range(Lvec),rep(1,2),col="darkgrey",lwd=3,lty="dashed")
+                 
+                 polygon(c(Lvec,rev(Lvec)),c(exp(est-2*sd),rev(exp(est+2*sd))),
+                         col="grey",border=NA)
+                 lines(Lvec,exp(est),lwd=3)
+                 
+                 points(Lvec,b$RawEstimate)
+                 apply(b$BootQuantiles,1,function(x)lines(Lvec,x))
+                 
+                 grid()
+                 
+                 dev.copy2pdf(file=paste("Relsel-",Species,"-",GearNames[2],"-vs-",GearNames[1],".pdf",sep=""))
+                 
+                 plot(Lvec,log10(1+Density1),
+                      ylim=log10(1+range(c(Density1,Density2))),
+                      xlim=c(Lmin,Lmax),
+                      type="l",lty="dashed",
+                      xlab="Length [cm]",ylab="Density (log10(N/A+1))")
+                 points(Lvec,log10(1+Density1),pch="o")
+                 lines(Lvec,log10(1+Density2))
+                 points(Lvec,log10(1+Density2),pch="+")
+                 legend("topright",legend=GearNames,lty=c("dashed","solid"),pch=c("o","+"))
+                 
+                 grid()
+                 
+                 dev.copy2pdf(file=paste("Density-",Species,"-",GearNames[2],"-vs-",GearNames[1],".pdf",sep=""))
+                 
+                 ## #############################################################################################
+                 ## Plot example of a size spectrum
+                 pl <- obj$env$parList()
+                 spec <- pl$logspectrum
+                 
+                 ## Take the station witht the largest catch
+                 ii <- which.max(apply(spec,1,sum))
+                 
+                 iii <- which(d$group == levels(d$group)[ii])
+                 
+                 nug1 <- pl$residual[iii,]
+                 
+                 plot(Lvec,exp(spec[ii,])*(d$SweptArea[ii])^exp(opt$par["logalpha"]),log="y",type="l",
+                      ylim=c(1e-1,max(d$N[iii,])),
+                      xlim=range(Lvec),
+                      xlab="Length [cm]",ylab="Size spectrum of population [#/cm]",lwd=3,
+                      main=paste(Species,"at station",d$group[ii]))
+                 grid()
+                 
+                 lines(Lvec,exp(spec[ii,] + nug1[1,])*d$SweptArea[ii]^exp(opt$par["logalpha"]),lty="solid")
+                 lines(Lvec,exp(spec[ii,] + nug1[2,])*d$SweptArea[ii]^exp(opt$par["logalpha"]),lty="dashed")
+                 
+                 points(Lvec,d$N[iii[1],],pch="+")
+                 points(Lvec,d$N[iii[2],],pch="o")
+                 
+                 legend("bottom",legend=c("Size structure at station",
+                                     paste(GearNames[1],", observed and modelled"),
+                                     paste(GearNames[2],", observed and modelled")),
+                        lwd=c(3,1,1),lty=c("solid","solid","dashed"),pch=c(NA,"+","o"))
 
-        lines(range(Lvec),rep(1,2),col="darkgrey",lwd=3,lty="dashed")
+                 grid()
 
-        polygon(c(Lvec,rev(Lvec)),c(exp(est-2*sd),rev(exp(est+2*sd))),
-                col="grey",border=NA)
-        lines(Lvec,exp(est),lwd=3)
+                 dev.copy2pdf(file=paste("Sample-",Species,"-",GearNames[2],"-vs-",GearNames[1],".pdf",sep=""))
 
-        points(Lvec,b$RawEstimate)
-        apply(b$BootQuantiles,1,function(x)lines(Lvec,x))
+                 res <- data.frame(L=Lvec,est=est,sd=sd)
 
-        grid()
+                 write.table(res,file=paste("Results-",Species,"-",GearNames[2],"-vs-",GearNames[1],".csv",sep=""))
+                 write.table(res,file=paste("Estimates-",Species,"-",GearNames[2],"-vs-",GearNames[1],".csv",sep=""))
 
-        dev.copy2pdf(file=paste("Relsel-",Species,"-",GearNames[2],"-vs-",GearNames[1],".pdf",sep=""))
-
-        ## plot(Lvec,log10(1+Density1),
-        ##      ylim=log10(1+range(c(Density1,Density2))),
-        ##      xlim=c(Lmin,Lmax),
-        ##      type="l",lty="dashed",
-        ##      xlab="Length [cm]",ylab="Density (log10(N/A+1))")
-        ## points(Lvec,log10(1+Density1),pch="o")
-        ## lines(Lvec,log10(1+Density2))
-        ## points(Lvec,log10(1+Density2),pch="+")
-        ## legend("topright",legend=GearNames,lty=c("dashed","solid"),pch=c("o","+"))
-
-        ## grid()
-
-        ## dev.copy2pdf(file=paste("Density-",Species,"-",GearNames[2],"-vs-",GearNames[1],".pdf",sep=""))
-
-        ## #############################################################################################
-        ## Plot example of a size spectrum
-        pl <- obj$env$parList()
-        spec <- pl$logspectrum
-
-        ## Take the station witht the largest catch
-        ii <- which.max(apply(spec,1,sum))
-
-        iii <- which(d$group == levels(d$group)[ii])
-
-        nug1 <- pl$residual[iii,]
-
-        plot(Lvec,exp(spec[ii,])*d$SweptArea[ii],log="y",type="l",ylim=c(1e-1,max(d$N[iii,])),
-             xlim=range(Lvec),
-             xlab="Length [cm]",ylab="Size spectrum of population [#/cm]",lwd=3,
-             main=paste(Species,"at station",d$group[ii]))
-        grid()
-
-        lines(Lvec,exp(spec[ii,] + nug1[1,])*d$SweptArea[ii],lty="solid")
-        lines(Lvec,exp(spec[ii,] + nug1[2,])*d$SweptArea[ii],lty="dashed")
-
-        points(Lvec,d$N[iii[1],],pch="+")
-        points(Lvec,d$N[iii[2],],pch="o")
-
-        legend("bottom",legend=c("Size structure at station",
-                            paste(GearNames[1],", observed and modelled"),
-                            paste(GearNames[2],", observed and modelled")),
-               lwd=c(3,1,1),lty=c("solid","solid","dashed"),pch=c(NA,"+","o"))
-
-        grid()
-
-        dev.copy2pdf(file=paste("Sample-",Species,"-",GearNames[2],"-vs-",GearNames[1],".pdf",sep=""))
-
-        res <- data.frame(L=Lvec,est=est,sd=sd)
-
-        write.table(res,file=paste("Results-",Species,"-",GearNames[2],"-vs-",GearNames[1],".csv",sep=""))
-        write.table(res,file=paste("Estimates-",Species,"-",GearNames[2],"-vs-",GearNames[1],".csv",sep=""))
-
-    })
+             })
     }
 
 fits <- list()
@@ -313,7 +318,7 @@ if(Do.Intercal)
                     ## Compare these two gear types
                     GearNames <- c("Gisund",gear)
 
-                    fits[[length(fits)+1]] <- fitmodel(Species,GearNames,d,Lvec)
+                    fits[[length(fits)+1]] <- fitmodel(Species,GearNames,d,Lvec,fit0=TRUE)
                     plotmodel(fits[[length(fits)]])
                 }
     }
@@ -330,12 +335,21 @@ if(Do.Verification)
                 {
                     d <- eval(parse(text=paste("listIntercalData_",Species,sep="")))
 
+                    d$SweptArea <- d$SweptArea[,1]
+
                     ## Pick only data from the 1990's
                     I <- grep("199",d$group)
                     d$Gear <- d$Gear[I]
                     d$N <- d$N[I,]
                     d$group <- d$group[I]
-                    d$SweptArea <- d$SweptArea[I,]
+                    d$SweptArea <- d$SweptArea[I]
+
+                    ## Discard short hauls
+                    I <- (d$SweptArea > 0.012)
+                    d$Gear <- d$Gear[I]
+                    d$N <- d$N[I,]
+                    d$group <- d$group[I]
+                    d$SweptArea <- d$SweptArea[I]
                     
                     d$Gear[d$Gear == "Blue Sea"] <- "Blue_Sea"
                     d$group <- factor(d$group)
@@ -343,13 +357,11 @@ if(Do.Verification)
                     ## Change order of gear such that Gisund is reference
                     d$Gear <- factor(d$Gear,levels=rev(unique(d$Gear)))
 
-                    d$SweptArea <- d$SweptArea[,1]
-
-
                     ## Compare these two gear types
                     GearNames <- c("Nansen","Blue_Sea")
 
-                    fits[[length(fits)+1]] <- fitmodel(Species,GearNames,d)
+                    fits[[length(fits)+1]] <- fitmodel(Species,GearNames,d,Lvec,fit0=TRUE)
+                    plotmodel(fits[[length(fits)]])
                 }
     }
 
