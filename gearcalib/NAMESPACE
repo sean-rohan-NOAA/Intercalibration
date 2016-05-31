@@ -1,0 +1,6 @@
+exportPattern("^[[:alpha:]]+")
+export(gearcalibFit)
+export(boot)
+export(plot.gearcalibFit)
+import(TMB)
+useDynLib(gearcalib)
