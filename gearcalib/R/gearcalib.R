@@ -24,8 +24,9 @@ check.gearcalib.data<-function(d){
 ##' @title Fit relative catch effiency by length group between to gears
 ##' @param d A list with four elements: N (matrix of integers), SweptArea(numeric vector), group(factor vector), and Gear(factor vector). 
 ##' @param fit0 If TRUE a Chisq-test of no size structure in gear effect is performed.
+##' @param linearEffort If TRUE, catch is assumed proportional to swept area, otherwise proportional to a power function of swept area.
 ##' @return A list
-gearcalibFit <- function(d,fit0=FALSE)
+gearcalibFit <- function(d,fit0=FALSE,linearEffort=TRUE)
     {
         check.gearcalib.data(d)
         nsize <- ncol(d$N)
@@ -63,10 +64,12 @@ gearcalibFit <- function(d,fit0=FALSE)
 
         map <- list()
         
+        if(linearEffort) map[["logalpha"]] <- factor(NA)
+            
         obj <- MakeADFun(
             data = data,
             parameters = parameters,
-            map = map, # phi=factor(NA),logsdnug=factor(NA),logsdGearRW=factor(NA)),
+            map = map, 
             random = random,
             DLL="gearcalib"
         )
