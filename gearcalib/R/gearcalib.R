@@ -53,7 +53,7 @@ gearcalibFit <- function(d,fit0=FALSE,linearEffort=TRUE)
             residual=matrix(0,nhaul,nsize),
             loggear=numeric(nsize),
             logsd=-1,
-            phi=0.99,
+            phi=0.9,
             logsdnug=-1,
             logsdres=-1,
             logsdGearRW=-1,
@@ -79,8 +79,9 @@ gearcalibFit <- function(d,fit0=FALSE,linearEffort=TRUE)
         if(any("phi" == names(obj$par)))
             {
                 lower["phi"] <- 0
-                upper["phi"] <- 0.9999
+                upper["phi"] <- 0.99
             }
+                
 
         obj$env$tracepar <- TRUE
 
@@ -187,11 +188,12 @@ boot <- function(d,quantiles = c(0.025,0.16,0.5,0.84,0.975),Nboot=1000)
 ##' @param fit an onject of class 'gearcalibFit' as fitted by gearcalib()
 ##' @param select a vector specifying which plots are wanted. Can be "relsel" for "Relative selectivity" or "density".
 ##' @param boot (optional) list with bootstrap estimates as produced by boot()
+##' @param Lvec (optional) vector with labels for each length group
 ##' @return nothing
-plot.gearcalibFit <- function(fit,select=c("relsel","density"),boot=NULL)
+plot.gearcalibFit <- function(fit,select=c("relsel","density"),boot=NULL, Lvec=NULL)
 {
     
-        Lvec <- 1:(ncol(fit$d$N))
+        if(is.null(Lvec)) Lvec <- 1:(ncol(fit$d$N))
         Lmin <- min(Lvec)
         Lmax <- max(Lvec)
         
