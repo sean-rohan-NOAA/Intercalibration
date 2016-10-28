@@ -26,7 +26,7 @@ check.gearcalib.data<-function(d){
 ##' @param fit0 If TRUE a Chisq-test of no size structure in gear effect is performed.
 ##' @param linearEffort If TRUE, catch is assumed proportional to swept area, otherwise proportional to a power function of swept area.
 ##' @return A list
-gearcalibFit <- function(d,fit0=FALSE,linearEffort=TRUE)
+gearcalibFit <- function(d,fit0=FALSE,logsd=NA,phi=NA,logsdnug=NA,logsdres=NA,logsdGearRW=NA,logalpha=0)
     {
         check.gearcalib.data(d)
         nsize <- ncol(d$N)
@@ -64,8 +64,20 @@ gearcalibFit <- function(d,fit0=FALSE,linearEffort=TRUE)
 
         map <- list()
         
-        if(linearEffort) map[["logalpha"]] <- factor(NA)
-            
+        ## If any parameters have been specified in the call, do not estimate those
+        ## parameters but fix them to the specified value
+        setparameter <- function(name) {
+            var <- get(name)
+            if(!is.na(var))
+            {
+                map[[name]] <<- factor(NA)
+                parameters[[name]] <<- var
+            }
+        }
+        parameternames <- c("logsd","phi","logsdnug","logsdres","logsdGearRW","logalpha")
+        sapply(parameternames,setparameter)
+
+        
         obj <- MakeADFun(
             data = data,
             parameters = parameters,
@@ -74,6 +86,7 @@ gearcalibFit <- function(d,fit0=FALSE,linearEffort=TRUE)
             DLL="gearcalib"
         )
 
+        
         lower <- 0*obj$par-Inf
         upper <- 0*obj$par+Inf
         if(any("phi" == names(obj$par)))
