@@ -5,12 +5,12 @@
 ##' @param d A 'gear calib list'
 ##' @return nothing
 check.gearcalib.data<-function(d){
-    stopifnot(class(d)=="list")
-    stopifnot( names(d)==c("N","SweptArea","group","Gear") )
-    stopifnot(class(d$N)=="matrix")
-    stopifnot(class(d$SweptArea)=="numeric")
-    stopifnot(class(d$group)=="factor")
-    stopifnot(class(d$Gear)=="factor")
+    stopifnot(is(d, "list"))
+    stopifnot(all(names(d) %in% c("N","SweptArea","group","Gear")))
+    stopifnot(is(d$N, "matrix"))
+    stopifnot(is(d$SweptArea, "numeric"))
+    stopifnot(is(d$group, "factor"))
+    stopifnot(is(d$Gear,"factor"))
     no.hauls <- nrow(d$N)
     stopifnot(dim(d$N)==dim(d$SweptArea))
     stopifnot(nlevels(d$group)==no.hauls/2)
