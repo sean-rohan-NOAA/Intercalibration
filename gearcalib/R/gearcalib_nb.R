@@ -53,7 +53,7 @@ gearcalibFitNB <-
           logsdres=-1,
           logsdGearRW=-1,
           logalpha = 0,
-          logtheta = -1
+          logtheta = -1,
           model_type = 1),
       "nb" = 
         list(
@@ -67,7 +67,7 @@ gearcalibFitNB <-
           logsdres=-1,
           logsdGearRW=-1,
           logalpha = 0,
-          logtheta = -1
+          logtheta = -1,
           model_type = 2),
       "zip"  = 
         list(
