@@ -20,8 +20,8 @@ template<class Type>
   Type objective_function<Type>::operator() ()
 {
   /* Data and parameters */
-  DATA_INTEGER(model_type); // 0=Poisson, 1=NegBin, 2=ZIP
   DATA_ARRAY(N);                // haul x size
+  DATA_INTEGER(model_type); // 0=Poisson, 1=NegBin, 2=ZIP
   DATA_VECTOR(SweptArea);       // Sample area for each haul. length=nhaul
   DATA_FACTOR(group);           // length(group)=nhaul. Defines pair ids
   DATA_FACTOR(Gear);            // length(Gear)=nhaul. Defines the two gear types
@@ -42,7 +42,7 @@ template<class Type>
   PARAMETER(logitpi);          // Zero-inflated Poisson logit pi
   
   // Transpose for access by row:
-    array<Type> tnugget=nugget.transpose();
+  array<Type> tnugget=nugget.transpose();
   array<Type> tresidual=residual.transpose();
   array<Type> tlogspectrum=logspectrum.transpose();
   array<Type> tN=N.transpose();
@@ -56,7 +56,7 @@ template<class Type>
   Type sdnug=exp(logsdnug);
   Type alpha=exp(logalpha);
   Type theta=exp(logtheta);
-  Type pi = 1 / (1 + exp(-logit_pi)); // Inverse logit to get pi in (0, 1)
+  Type pi = 1 / (1 + exp(-logitpi)); // Inverse logit to get pi in (0, 1)
   
   // Random walk over size spectrum at each station
   for(int i=0; i<tlogspectrum.cols(); i++){
