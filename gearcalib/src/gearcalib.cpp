@@ -39,10 +39,8 @@ Type objective_function<Type>::operator() ()
   PARAMETER(logsdres);          // sd of residuals
   PARAMETER(logsdGearRW);       // sd of increments in gear effect
   PARAMETER(logalpha);          // Exponent on the effect of SweptArea
-  PARAMETER(logit_pi);          // Zero-inflation probability (logit scale)
-  
-  // Convert to probability
-  Type pi = 1 / (1 + exp(-logit_pi));
+  PARAMETER(logitpi);          // Zero-inflation probability (logit scale)
+  PARAMETER(logtheta);
   
   // Transpose for access by row:
   array<Type> tnugget = nugget.transpose();
@@ -58,6 +56,8 @@ Type objective_function<Type>::operator() ()
   Type sdGearRW = exp(logsdGearRW);
   Type sdnug = exp(logsdnug);
   Type alpha = exp(logalpha);
+  Type pi = 1 / (1 + exp(-logitpi));
+  Type theta = exp(logtheta);
   
   // Random walk over size spectrum at each station
   for(int i = 0; i < tlogspectrum.cols(); i++) {
@@ -112,13 +112,17 @@ Type objective_function<Type>::operator() ()
       }
     } 
     else {
-      error("Invalid model_type: must be 0 (Poisson) or 1 (ZIP)");
+      error("Invalid model_type: must be 1 (Poisson) or 3 (ZIP)");
     }
   }
   
   // Neutralize unused parameters
-  if (model_type != 1) {
-    ans -= dnorm(logit_pi, Type(0), Type(1e-3), true);
+  if (model_type != 3) {
+    ans -= dnorm(logitpi, Type(0), Type(1e-3), true);
+  }
+  
+  if (model_type != 2) {
+    ans -= dnorm(logtheta, Type(0), Type(1e-3), true);
   }
   
   return ans;
