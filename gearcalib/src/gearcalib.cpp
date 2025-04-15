@@ -96,30 +96,23 @@ template<class Type>
     }
     
     vector<Type> mu = exp(logintensity);
-      
-    for (int j = 0; j < nsize; j++) {
-      Type y = tN(i, j);
-        
-      if (model_type ==  1) {
-        // Poisson
-        ans -= dpois(y, mu(j), true);
-        
-      } else if (model_type == 2) {
-        // Negative Binomial
-        Type var = mu(j) + mu(j) * mu(j) / theta;
-        ans -= dnbinom2(y, mu(j), var, true);
-         
-      } else if (model_type == 3) {
-          // Zero-inflated Poisson
-          if (y == 0) {
-            ans -= log(pi + (1 - pi) * exp(dpois(Type(0), mu(j), true)));
-          } else {
-            ans -= log(1 - pi) + dpois(y, mu(j), true);
-          }
-          
-      } else {
-        // Safety fallback (should never be hit if model_type is validated externally)
-        error("Invalid model_type specified.");
+    
+    if(model_type ==  1) {
+      // Poisson
+      ans-=dpois(vector<Type>(tN.col(i)),mu,true).sum();
+    } else if (model_type == 2) {
+      // Negative Binomial
+      Type var = mu(j) + mu(j) * mu(j) / theta;
+      ans -= dnbinom2(y, mu(j), var, true);
+    } else if (model_type == 3) {
+      // Zero-inflated Poisson
+      for (int j = 0; j < nsize; j++) {
+        Type y = tN(i, j);
+        if (y == 0) {
+          ans -= log(pi + (1 - pi) * exp(dpois(Type(0), mu(j), true)));
+        } else {
+          ans -= log(1 - pi) + dpois(y, mu(j), true);
+        }
       }
     }
   }
