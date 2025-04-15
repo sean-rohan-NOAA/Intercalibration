@@ -38,13 +38,13 @@ Type objective_function<Type>::operator() ()
   PARAMETER(logsdGearRW);       // sd of increments in gear effect
   PARAMETER(logalpha);             // Exponent on the effect of SweptArea
   PARAMETER(logtheta);         // NB theta
-  
+
   // Transpose for access by row:
   array<Type> tnugget=nugget.transpose();
   array<Type> tresidual=residual.transpose();
   array<Type> tlogspectrum=logspectrum.transpose();
   array<Type> tN=N.transpose();
-  
+
   int nhaul=N.dim[0];
   int nsize=N.dim[1];
   int ngear=NLEVELS(Gear);
@@ -53,34 +53,34 @@ Type objective_function<Type>::operator() ()
   Type sdGearRW=exp(logsdGearRW);
   Type sdnug=exp(logsdnug);
   Type alpha=exp(logalpha);
-  Type theta = exp(logtheta);
-  
+  Type theta=exp(logtheta);
+
   // Random walk over size spectrum at each station
   for(int i=0; i<tlogspectrum.cols(); i++){
     ans -= RW_logdens(vector<Type>(tlogspectrum.col(i)), sd, huge, rw_order(0));
   }
-  
+
   // AR(1) residuals
   using namespace density;
   SCALE_t< AR1_t<N01<Type> > >  nldens=SCALE(AR1(phi),exp(logsdres));
   for(int i=0; i<nhaul; i++){
     ans += nldens(tresidual.col(i));
   }
-  
+
   // White noise nugget effect
   for(int j=0;j<nsize;j++)
     ans -= dnorm(vector<Type>(nugget.col(j)),Type(0),sdnug,true).sum();
-  
+
   // Random walk prior on gear effect
   ans -= RW_logdens(loggear, sdGearRW, huge, rw_order(1));
-  
+
   // Add data
   vector<Type> logintensity(nsize);
   for(int i=0;i<nhaul;i++)
   {
     logintensity=
       tlogspectrum.col(group[i])
-    +tresidual.col(i) 
+    +tresidual.col(i)
     +alpha*log(SweptArea(i))
     +tnugget.col(i);
     if(Gear(i)==1)
@@ -89,13 +89,13 @@ Type objective_function<Type>::operator() ()
     }
     else
       logintensity -= loggear;
-    
+
     vector<Type> mu = exp(logintensity);
     vector<Type> var = mu + mu * mu / theta;
-    for (int j = 0; j < nsize; j++) {
+    for(int j = 0; j < nsize; j++){
       ans -= dnbinom2(tN(i,j), mu(j), var(j), true);
     }
   }
-  
+
   return ans;
 }
