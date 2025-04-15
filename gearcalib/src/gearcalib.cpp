@@ -14,8 +14,7 @@ Type RW_logdens(vector<Type> x, Type sd, Type huge, int order=1){
   return ans;
 }
 
-// Compare two gear types
-
+// Main model
 template<class Type>
 Type objective_function<Type>::operator() ()
 {
@@ -27,7 +26,7 @@ Type objective_function<Type>::operator() ()
   DATA_SCALAR(huge);            // "Infinite" standard deviation on log scale
   DATA_SCALAR(tiny);            // "Zero" standard deviation on log scale
   DATA_IVECTOR(rw_order);       // Order of logspectrum and loggear RW
-  DATA_INTEGER(model_type);     // 0 = Poisson, 1 = Zero-inflated Poisson
+  DATA_INTEGER(model_type);       // 0 = Poisson, 1 = ZIP
   
   PARAMETER_ARRAY(logspectrum); // group x size. One spectrum for each pair id
   PARAMETER_ARRAY(nugget);      // haul x size. One nugget for each haul
@@ -39,10 +38,9 @@ Type objective_function<Type>::operator() ()
   PARAMETER(logsdres);          // sd of residuals
   PARAMETER(logsdGearRW);       // sd of increments in gear effect
   PARAMETER(logalpha);          // Exponent on the effect of SweptArea
-  PARAMETER(logitpi);          // Zero-inflation probability (logit scale)
-  PARAMETER(logtheta);
+  PARAMETER(logitpi);          // Logit-zero-inflation (only used for ZIP)
   
-  // Transpose for access by row:
+  // Transpose for row-wise access:
   array<Type> tnugget = nugget.transpose();
   array<Type> tresidual = residual.transpose();
   array<Type> tlogspectrum = logspectrum.transpose();
@@ -50,80 +48,65 @@ Type objective_function<Type>::operator() ()
   
   int nhaul = N.dim[0];
   int nsize = N.dim[1];
-  int ngear = NLEVELS(Gear);
   Type ans = 0;
+  
   Type sd = exp(logsd);
   Type sdGearRW = exp(logsdGearRW);
   Type sdnug = exp(logsdnug);
   Type alpha = exp(logalpha);
-  Type pi = 1 / (1 + exp(-logitpi));
-  Type theta = exp(logtheta);
+  Type pi = Type(1) / (Type(1) + exp(-logitpi));  // inverse logit
   
   // Random walk over size spectrum at each station
-  for(int i = 0; i < tlogspectrum.cols(); i++) {
+  for (int i = 0; i < tlogspectrum.cols(); i++) {
     ans -= RW_logdens(vector<Type>(tlogspectrum.col(i)), sd, huge, rw_order(0));
   }
   
   // AR(1) residuals
   using namespace density;
   SCALE_t< AR1_t<N01<Type> > > nldens = SCALE(AR1(phi), exp(logsdres));
-  for(int i = 0; i < nhaul; i++) {
+  for (int i = 0; i < nhaul; i++) {
     ans += nldens(tresidual.col(i));
   }
   
   // White noise nugget effect
-  for(int j = 0; j < nsize; j++) {
+  for (int j = 0; j < nsize; j++) {
     ans -= dnorm(vector<Type>(nugget.col(j)), Type(0), sdnug, true).sum();
   }
   
   // Random walk prior on gear effect
   ans -= RW_logdens(loggear, sdGearRW, huge, rw_order(1));
   
-  // Add data
-  vector<Type> logintensity(nsize);
-  for(int i = 0; i < nhaul; i++) {
-    logintensity =
-      tlogspectrum.col(group[i])
-    + tresidual.col(i) 
-    + alpha * log(SweptArea(i))
-    + tnugget.col(i);
+  // Likelihood contribution
+  for (int i = 0; i < nhaul; i++) {
+    vector<Type> logintensity =
+      tlogspectrum.col(group[i]) +
+      tresidual.col(i) +
+      alpha * log(SweptArea(i)) +
+      tnugget.col(i);
     
-    if(Gear(i) == 1) {
+    if (Gear(i) == 1) {
       logintensity += loggear;
     } else {
       logintensity -= loggear;
     }
     
     vector<Type> mu = exp(logintensity);
+    vector<Type> y = tN.col(i);
+    vector<Type> pois_ll = dpois(y, mu, true);
     
-    if (model_type == 1) {
-      // Poisson
-      ans -= dpois(vector<Type>(tN.col(i)), mu, true).sum();
-    } 
-    else if (model_type == 3) {
-      // Zero-inflated Poisson
+    if (model_type == 1) { // Poisson
+      ans -= pois_ll.sum();
+    } else if (model_type == 3) { // ZIP
       for (int j = 0; j < nsize; j++) {
-        Type y = tN(i, j);
-        if (y == 0) {
-          ans -= log(pi + (1 - pi) * exp(dpois(Type(0), mu(j), true)));
+        if (y(j) == 0) {
+          ans -= log(pi + (1 - pi) * exp(pois_ll(j)));
         } else {
-          ans -= log(1 - pi) + dpois(y, mu(j), true);
+          ans -= log(1 - pi) + pois_ll(j);
         }
       }
-    } 
-    else {
-      error("Invalid model_type: must be 1 (Poisson) or 3 (ZIP)");
     }
-  }
-  
-  // Neutralize unused parameters
-  if (model_type != 3) {
-    ans -= dnorm(logitpi, Type(0), Type(1e-3), true);
-  }
-  
-  if (model_type != 2) {
-    ans -= dnorm(logtheta, Type(0), Type(1e-3), true);
   }
   
   return ans;
 }
+
