@@ -11,3 +11,4 @@ Depends:
     R (>= 3.0),
     TMB
 LinkingTo: TMB, RcppEigen
+RoxygenNote: 7.3.2
