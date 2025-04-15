@@ -37,7 +37,6 @@ Type objective_function<Type>::operator() ()
   PARAMETER(logsdres);          // sd of residuals
   PARAMETER(logsdGearRW);       // sd of increments in gear effect
   PARAMETER(logalpha);             // Exponent on the effect of SweptArea
-  PARAMETER(logtheta);         // NB theta
 
   // Transpose for access by row:
   array<Type> tnugget=nugget.transpose();
@@ -53,7 +52,6 @@ Type objective_function<Type>::operator() ()
   Type sdGearRW=exp(logsdGearRW);
   Type sdnug=exp(logsdnug);
   Type alpha=exp(logalpha);
-  Type theta=exp(logtheta);
 
   // Random walk over size spectrum at each station
   for(int i=0; i<tlogspectrum.cols(); i++){
@@ -77,25 +75,22 @@ Type objective_function<Type>::operator() ()
   // Add data
   vector<Type> logintensity(nsize);
   for(int i=0;i<nhaul;i++)
-  {
-    logintensity=
-      tlogspectrum.col(group[i])
-    +tresidual.col(i)
-    +alpha*log(SweptArea(i))
-    +tnugget.col(i);
-    if(Gear(i)==1)
     {
-      logintensity += loggear;
-    }
-    else
-      logintensity -= loggear;
+      logintensity=
+	tlogspectrum.col(group[i])
+	+tresidual.col(i)
+	+alpha*log(SweptArea(i))
+	+tnugget.col(i);
+      if(Gear(i)==1)
+	{
+	  logintensity += loggear;
+	}
+      else
+	logintensity -= loggear;
 
-    vector<Type> mu = exp(logintensity);
-    vector<Type> var = mu + mu * mu / theta;
-    for(int j = 0; j < nsize; j++){
-      ans -= dnbinom2(tN(i,j), mu(j), var(j), true);
+      ans-=dpois(vector<Type>(tN.col(i)),exp(logintensity),true).sum();
     }
-  }
 
   return ans;
 }
+
