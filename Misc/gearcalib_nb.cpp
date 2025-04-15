@@ -36,8 +36,8 @@ Type objective_function<Type>::operator() ()
   PARAMETER(logsdnug);          // sd of nugget effect
   PARAMETER(logsdres);          // sd of residuals
   PARAMETER(logsdGearRW);       // sd of increments in gear effect
-  PARAMETER(logalpha);             // Exponent on the effect of SweptArea
-  PARAMETER(logtheta);         // NB theta
+  PARAMETER(logalpha);          // Exponent on the effect of SweptArea
+  PARAMETER(logtheta);          // Theta parameter for negative binomial
 
   // Transpose for access by row:
   array<Type> tnugget=nugget.transpose();

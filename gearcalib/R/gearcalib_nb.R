@@ -5,9 +5,20 @@
 ##' @param d A list with four elements: N (matrix of integers), SweptArea(numeric vector), group(factor vector), and Gear(factor vector). 
 ##' @param fit0 If TRUE a Chisq-test of no size structure in gear effect is performed.
 ##' @param linearEffort If TRUE, catch is assumed proportional to swept area, otherwise proportional to a power function of swept area.
+##' @param model "poisson" = Poisson, "nb" = Negative binomial, "zip" = zero-inflated Poisson
 ##' @return A list
-gearcalibFitNB <- function(d,fit0=FALSE,logsd=NA,phi=NA,logsdnug=NA,logsdres=NA,logsdGearRW=NA,logalpha=0,logtheta=NA)
-{
+gearcalibFitNB <- 
+  function(d,
+           fit0=FALSE,
+           logsd=NA,
+           phi=NA,
+           logsdnug=NA,
+           logsdres=NA,
+           logsdGearRW=NA,
+           logalpha=0,
+           logtheta=NA,
+           logitpi=NA,
+           model = "poisson") {
   check.gearcalib.data(d)
   nsize <- ncol(d$N)
   ngroup <- nlevels(d$group)
@@ -27,19 +38,53 @@ gearcalibFitNB <- function(d,fit0=FALSE,logsd=NA,phi=NA,logsdnug=NA,logsdres=NA,
     rw_order=rw_order
   )
   
-  parameters=list(
-    logspectrum=matrix(0,ngroup,nsize),
-    nugget=matrix(0,nhaul,nsize),
-    residual=matrix(0,nhaul,nsize),
-    loggear=numeric(nsize),
-    logsd=-1,
-    phi=0.9,
-    logsdnug=-1,
-    logsdres=-1,
-    logsdGearRW=-1,
-    logalpha = 0,
-    logtheta = -1
-  )
+  parameters <- 
+    switch(
+      model,
+      "poisson" = 
+        list(
+          logspectrum=matrix(0,ngroup,nsize),
+          nugget=matrix(0,nhaul,nsize),
+          residual=matrix(0,nhaul,nsize),
+          loggear=numeric(nsize),
+          logsd=-1,
+          phi=0.9,
+          logsdnug=-1,
+          logsdres=-1,
+          logsdGearRW=-1,
+          logalpha = 0,
+          logtheta = -1
+          model_type = 1),
+      "nb" = 
+        list(
+          logspectrum=matrix(0,ngroup,nsize),
+          nugget=matrix(0,nhaul,nsize),
+          residual=matrix(0,nhaul,nsize),
+          loggear=numeric(nsize),
+          logsd=-1,
+          phi=0.9,
+          logsdnug=-1,
+          logsdres=-1,
+          logsdGearRW=-1,
+          logalpha = 0,
+          logtheta = -1
+          model_type = 2),
+      "zip"  = 
+        list(
+          logspectrum=matrix(0,ngroup,nsize),
+          nugget=matrix(0,nhaul,nsize),
+          residual=matrix(0,nhaul,nsize),
+          loggear=numeric(nsize),
+          logsd=-1,
+          phi=0.9,
+          logsdnug=-1,
+          logsdres=-1,
+          logsdGearRW=-1,
+          logalpha = 0,
+          logitpi = 0,
+          model_type = 3)
+    )
+
   
   random <- c("logspectrum","residual","loggear","nugget")
   
@@ -55,8 +100,8 @@ gearcalibFitNB <- function(d,fit0=FALSE,logsd=NA,phi=NA,logsdnug=NA,logsdres=NA,
       parameters[[name]] <<- var
     }
   }
-  parameternames <- c("logsd","phi","logsdnug","logsdres","logsdGearRW","logalpha","logtheta")
-  sapply(parameternames,setparameter)
+  parameternames <- c("logsd","phi","logsdnug","logsdres","logsdGearRW","logalpha","logtheta","logitpi")
+  sapply(parameternames, setparameter)
   
   
   obj <- MakeADFun(
