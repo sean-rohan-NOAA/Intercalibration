@@ -38,52 +38,27 @@ gearcalibFitNB <-
     rw_order=rw_order
   )
   
-  parameters <- 
+  data$model_type <- 
     switch(
       model,
-      "poisson" = 
-        list(
-          logspectrum=matrix(0,ngroup,nsize),
-          nugget=matrix(0,nhaul,nsize),
-          residual=matrix(0,nhaul,nsize),
-          loggear=numeric(nsize),
-          logsd=-1,
-          phi=0.9,
-          logsdnug=-1,
-          logsdres=-1,
-          logsdGearRW=-1,
-          logalpha = 0,
-          logtheta = -1,
-          model_type = 1),
-      "nb" = 
-        list(
-          logspectrum=matrix(0,ngroup,nsize),
-          nugget=matrix(0,nhaul,nsize),
-          residual=matrix(0,nhaul,nsize),
-          loggear=numeric(nsize),
-          logsd=-1,
-          phi=0.9,
-          logsdnug=-1,
-          logsdres=-1,
-          logsdGearRW=-1,
-          logalpha = 0,
-          logtheta = -1,
-          model_type = 2),
-      "zip"  = 
-        list(
-          logspectrum=matrix(0,ngroup,nsize),
-          nugget=matrix(0,nhaul,nsize),
-          residual=matrix(0,nhaul,nsize),
-          loggear=numeric(nsize),
-          logsd=-1,
-          phi=0.9,
-          logsdnug=-1,
-          logsdres=-1,
-          logsdGearRW=-1,
-          logalpha = 0,
-          logitpi = 0,
-          model_type = 3)
+      "poisson" = 1,
+      "nb" = 2,
+      "zip" = 3
     )
+  
+  parameters <- 
+        list(
+          logspectrum=matrix(0,ngroup,nsize),
+          nugget=matrix(0,nhaul,nsize),
+          residual=matrix(0,nhaul,nsize),
+          loggear=numeric(nsize),
+          logsd=-1,
+          phi=0.9,
+          logsdnug=-1,
+          logsdres=-1,
+          logsdGearRW=-1,
+          logalpha = 0,
+          logtheta = 0)
 
   
   random <- c("logspectrum","residual","loggear","nugget")
@@ -102,6 +77,8 @@ gearcalibFitNB <-
   }
   parameternames <- c("logsd","phi","logsdnug","logsdres","logsdGearRW","logalpha","logtheta","logitpi")
   sapply(parameternames, setparameter)
+  
+  print(names(paramaters))
   
   
   obj <- MakeADFun(

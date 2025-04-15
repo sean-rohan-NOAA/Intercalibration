@@ -122,5 +122,8 @@ template<class Type>
       }
   }
   
+  if (model_type != 2) ans -= dnorm(logtheta, Type(0), Type(1e-3), true);  // penalize away from 0
+  if (model_type != 3) ans -= dnorm(logitpi, Type(0), Type(1e-3), true);   // same
+  
   return ans;
   }
