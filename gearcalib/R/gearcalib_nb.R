@@ -6,7 +6,7 @@
 ##' @param fit0 If TRUE a Chisq-test of no size structure in gear effect is performed.
 ##' @param linearEffort If TRUE, catch is assumed proportional to swept area, otherwise proportional to a power function of swept area.
 ##' @return A list
-gearcalibFitNB <- function(d,fit0=FALSE,logsd=NA,phi=NA,logsdnug=NA,logsdres=NA,logsdGearRW=NA,logalpha=0)
+gearcalibFitNB <- function(d,fit0=FALSE,logsd=NA,phi=NA,logsdnug=NA,logsdres=NA,logsdGearRW=NA,logalpha=0,logtheta=NA)
 {
   check.gearcalib.data(d)
   nsize <- ncol(d$N)
