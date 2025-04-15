@@ -90,24 +90,26 @@ template<class Type>
     {
       logintensity += loggear;
     }
-    else
+    else 
+    {
       logintensity -= loggear;
+    }
+    
+    vector<Type> mu = exp(logintensity);
       
-      vector<Type> mu = exp(logintensity);
-      
-      for (int j = 0; j < nsize; j++) {
-        Type y = tN(i, j);
+    for (int j = 0; j < nsize; j++) {
+      Type y = tN(i, j);
         
-        if (model_type ==  1) {
-          // Poisson
-          ans -= dpois(y, mu(j), true);
-          
-        } else if (model_type == 2) {
-          // Negative Binomial
-          Type var = mu(j) + mu(j) * mu(j) / theta;
-          ans -= dnbinom2(y, mu(j), var, true);
-          
-        } else if (model_type == 3) {
+      if (model_type ==  1) {
+        // Poisson
+        ans -= dpois(y, mu(j), true);
+        
+      } else if (model_type == 2) {
+        // Negative Binomial
+        Type var = mu(j) + mu(j) * mu(j) / theta;
+        ans -= dnbinom2(y, mu(j), var, true);
+         
+      } else if (model_type == 3) {
           // Zero-inflated Poisson
           if (y == 0) {
             ans -= log(pi + (1 - pi) * exp(dpois(Type(0), mu(j), true)));
@@ -115,11 +117,11 @@ template<class Type>
             ans -= log(1 - pi) + dpois(y, mu(j), true);
           }
           
-        } else {
-          // Safety fallback (should never be hit if model_type is validated externally)
-          error("Invalid model_type specified.");
-        }
+      } else {
+        // Safety fallback (should never be hit if model_type is validated externally)
+        error("Invalid model_type specified.");
       }
+    }
   }
   
   if (model_type != 2) ans -= dnorm(logtheta, Type(0), Type(1e-3), true);  // penalize away from 0

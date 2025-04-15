@@ -78,9 +78,6 @@ gearcalibFitNB <-
   parameternames <- c("logsd","phi","logsdnug","logsdres","logsdGearRW","logalpha","logtheta","logitpi")
   sapply(parameternames, setparameter)
   
-  print(names(paramaters))
-  
-  
   obj <- MakeADFun(
     data = data,
     parameters = parameters,
