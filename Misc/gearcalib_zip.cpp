@@ -56,7 +56,7 @@ template<class Type>
   Type sdnug=exp(logsdnug);
   Type alpha=exp(logalpha);
   Type theta=exp(logtheta);
-  Type pi = 1 / (1 + exp(-logit_pi)); // Inverse logit to get pi in (0, 1)
+  Type pi = 1 / (1 + exp(-logitpi)); // Inverse logit to get pi in (0, 1)
   
   // Random walk over size spectrum at each station
   for(int i=0; i<tlogspectrum.cols(); i++){
