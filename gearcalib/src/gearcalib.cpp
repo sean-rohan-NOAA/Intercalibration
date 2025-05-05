@@ -57,7 +57,7 @@ Type objective_function<Type>::operator() ()
   Type sdGearRW = exp(logsdGearRW);
   Type sdnug = exp(logsdnug);
   Type alpha = exp(logalpha);
-  Type pi = Type(1) / (Type(1) + exp(-logit_pi));
+  Type pi = Type(1) / (Type(1) + exp(-logitpi));
   Type theta_nb = exp(logtheta);
   
   // Random walk on log spectrum
