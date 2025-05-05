@@ -57,9 +57,15 @@ Type objective_function<Type>::operator() ()
   Type sdGearRW = exp(logsdGearRW);
   Type sdnug = exp(logsdnug);
   Type alpha = exp(logalpha);
-  Type pi = Type(1) / (Type(1) + exp(-logitpi));
-  Type theta_nb = exp(logtheta);
   
+  if (model_type == 2) {
+    Type pi = Type(1) / (Type(1) + exp(-logitpi));
+  }
+  
+  if (model_type == 3) {
+    Type theta_nb = exp(logtheta);
+  }
+
   // Random walk on log spectrum
   for (int i = 0; i < tlogspectrum.cols(); i++) {
     ans -= RW_logdens(vector<Type>(tlogspectrum.col(i)), sd, huge, rw_order(0));
