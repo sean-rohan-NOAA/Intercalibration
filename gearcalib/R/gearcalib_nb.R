@@ -46,20 +46,60 @@ gearcalibFitNB <-
         "zip" = 3
       )
     
+    
     parameters <- 
-      list(
-        logspectrum=matrix(0,ngroup,nsize),
-        nugget=matrix(0,nhaul,nsize),
-        residual=matrix(0,nhaul,nsize),
-        loggear=numeric(nsize),
-        logsd=-1,
-        phi=0.9,
-        logsdnug=-1,
-        logsdres=-1,
-        logsdGearRW=-1,
-        logalpha = 0,
-        logtheta = 0,
-        logitpi=0)
+      switch(
+        model,
+        "poisson" = 
+          list(
+            logspectrum=matrix(0,ngroup,nsize),
+            nugget=matrix(0,nhaul,nsize),
+            residual=matrix(0,nhaul,nsize),
+            loggear=numeric(nsize),
+            logsd=-1,
+            phi=0.9,
+            logsdnug=-1,
+            logsdres=-1,
+            logsdGearRW=-1,
+            logalpha = 0,
+            logtheta = NA,
+            logitpi = NA
+          ),
+        "nb" = 
+          list(
+            logspectrum=matrix(0,ngroup,nsize),
+            nugget=matrix(0,nhaul,nsize),
+            residual=matrix(0,nhaul,nsize),
+            loggear=numeric(nsize),
+            logsd=-1,
+            phi=0.9,
+            logsdnug=-1,
+            logsdres=-1,
+            logsdGearRW=-1,
+            logalpha = 0,
+            logtheta = 0,
+            logitpi = NA
+          ),
+        "zip" = 
+          list(
+            logspectrum=matrix(0,ngroup,nsize),
+            nugget=matrix(0,nhaul,nsize),
+            residual=matrix(0,nhaul,nsize),
+            loggear=numeric(nsize),
+            logsd=-1,
+            phi=0.9,
+            logsdnug=-1,
+            logsdres=-1,
+            logsdGearRW=-1,
+            logalpha = 0,
+            logtheta = NA,
+            logitpi = 0
+          )
+      )
+
+
+    
+
     
     
     random <- c("logspectrum","residual","loggear","nugget")

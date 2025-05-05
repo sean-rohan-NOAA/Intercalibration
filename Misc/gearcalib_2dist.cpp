@@ -2,17 +2,17 @@
 
 // Random Walk density ('huge' is optional)
 template<class Type>
-  Type RW_logdens(vector<Type> x, Type sd, int order=1){
-    for(int i=0; i<order; i++) x = diff(x);
-    return dnorm(x, Type(0), sd, true).sum();
-  }
+Type RW_logdens(vector<Type> x, Type sd, int order=1){
+  for(int i=0; i<order; i++) x = diff(x);
+  return dnorm(x, Type(0), sd, true).sum();
+}
 template<class Type>
-  Type RW_logdens(vector<Type> x, Type sd, Type huge, int order=1){
-    Type ans = 0;
-    for(int i=0; i<order; i++) ans += dnorm(x(i), Type(0), huge, true);
-    ans += RW_logdens(x, sd, order);
-    return ans;
-  }
+Type RW_logdens(vector<Type> x, Type sd, Type huge, int order=1){
+  Type ans = 0;
+  for(int i=0; i<order; i++) ans += dnorm(x(i), Type(0), huge, true);
+  ans += RW_logdens(x, sd, order);
+  return ans;
+}
 
 // Main model
 template<class Type>
@@ -26,7 +26,7 @@ Type objective_function<Type>::operator() ()
   DATA_SCALAR(huge);            // "Infinite" standard deviation on log scale
   DATA_SCALAR(tiny);            // "Zero" standard deviation on log scale
   DATA_IVECTOR(rw_order);       // Order of logspectrum and loggear RW
-  DATA_INTEGER(model_type);       // 0 = Poisson, 1 = ZIP, 2 = NB
+  DATA_INTEGER(model_type);       // 0 = Poisson, 1 = ZIP
   
   PARAMETER_ARRAY(logspectrum); // group x size. One spectrum for each pair id
   PARAMETER_ARRAY(nugget);      // haul x size. One nugget for each haul
@@ -38,12 +38,9 @@ Type objective_function<Type>::operator() ()
   PARAMETER(logsdres);          // sd of residuals
   PARAMETER(logsdGearRW);       // sd of increments in gear effect
   PARAMETER(logalpha);          // Exponent on the effect of SweptArea
+  PARAMETER(logitpi);          // Logit-zero-inflation (only used for ZIP)
   
-  // ZIP & NB-specific parameters
-  PARAMETER(logitpi);          // Only for ZIP
-  PARAMETER(logtheta);           // Only for NB
-  
-  // Transpose for row-wise access
+  // Transpose for row-wise access:
   array<Type> tnugget = nugget.transpose();
   array<Type> tresidual = residual.transpose();
   array<Type> tlogspectrum = logspectrum.transpose();
@@ -57,10 +54,9 @@ Type objective_function<Type>::operator() ()
   Type sdGearRW = exp(logsdGearRW);
   Type sdnug = exp(logsdnug);
   Type alpha = exp(logalpha);
-  Type pi = Type(1) / (Type(1) + exp(-logit_pi));
-  Type theta_nb = exp(logtheta);
+  Type pi = Type(1) / (Type(1) + exp(-logitpi));  // inverse logit
   
-  // Random walk on log spectrum
+  // Random walk over size spectrum at each station
   for (int i = 0; i < tlogspectrum.cols(); i++) {
     ans -= RW_logdens(vector<Type>(tlogspectrum.col(i)), sd, huge, rw_order(0));
   }
@@ -72,15 +68,15 @@ Type objective_function<Type>::operator() ()
     ans += nldens(tresidual.col(i));
   }
   
-  // Nugget effect
+  // White noise nugget effect
   for (int j = 0; j < nsize; j++) {
     ans -= dnorm(vector<Type>(nugget.col(j)), Type(0), sdnug, true).sum();
   }
   
-  // Gear effect RW
+  // Random walk prior on gear effect
   ans -= RW_logdens(loggear, sdGearRW, huge, rw_order(1));
   
-  // Likelihood
+  // Likelihood contribution
   for (int i = 0; i < nhaul; i++) {
     vector<Type> logintensity =
       tlogspectrum.col(group[i]) +
@@ -88,17 +84,19 @@ Type objective_function<Type>::operator() ()
       alpha * log(SweptArea(i)) +
       tnugget.col(i);
     
-    if (Gear(i) == 1) logintensity += loggear;
-    else logintensity -= loggear;
+    if (Gear(i) == 1) {
+      logintensity += loggear;
+    } else {
+      logintensity -= loggear;
+    }
     
     vector<Type> mu = exp(logintensity);
     vector<Type> y = tN.col(i);
     vector<Type> pois_ll = dpois(y, mu, true);
     
-    if (model_type == 1) {  // Poisson
+    if (model_type == 1) { // Poisson
       ans -= pois_ll.sum();
-      
-    } else if (model_type == 2) {  // ZIP
+    } else if (model_type == 3) { // ZIP
       for (int j = 0; j < nsize; j++) {
         if (y(j) == 0) {
           ans -= log(pi + (1 - pi) * exp(pois_ll(j)));
@@ -106,15 +104,9 @@ Type objective_function<Type>::operator() ()
           ans -= log(1 - pi) + pois_ll(j);
         }
       }
-      
-    } else if (model_type == 3) {  // Negative Binomial
-      for (int j = 0; j < nsize; j++) {
-        Type size = theta_nb;
-        Type prob = size / (size + mu(j));
-        ans -= dnbinom(y(j), size, prob, true);
-      }
     }
   }
   
   return ans;
 }
+
